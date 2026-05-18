@@ -505,6 +505,10 @@ textarea {
   font-weight: 700;
 }
 
+.form-error.success {
+  color: var(--success);
+}
+
 .material-card {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

@@ -124,6 +124,8 @@ const state = {
   registeredUsers: loadRegisteredUsers()
 };
 
+let memoryStorage = {};
+
 const els = {
   navButtons: document.querySelectorAll(".top-nav .nav-button"),
   topNav: document.querySelector(".top-nav"),
@@ -166,8 +168,65 @@ const els = {
   adminConferences: document.querySelector("#admin-conferences")
 };
 
+function getStorage() {
+  try {
+    const testKey = "__confspace_test__";
+    window.localStorage.setItem(testKey, "ok");
+    window.localStorage.removeItem(testKey);
+    return window.localStorage;
+  } catch {
+    return {
+      getItem(key) {
+        return Object.prototype.hasOwnProperty.call(memoryStorage, key) ? memoryStorage[key] : null;
+      },
+      setItem(key, value) {
+        memoryStorage[key] = String(value);
+      },
+      removeItem(key) {
+        delete memoryStorage[key];
+      }
+    };
+  }
+}
+
+const storage = getStorage();
+
+function setFormMessage(element, message, type = "error") {
+  element.textContent = message;
+  element.classList.toggle("success", type === "success");
+}
+
+function clearFormMessage(element) {
+  setFormMessage(element, "");
+}
+
+function normalizeEmail(email) {
+  return String(email || "").trim().toLowerCase();
+}
+
+function isValidEmail(email) {
+  return /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email);
+}
+
+function isStrongEnoughPassword(password) {
+  return typeof password === "string" && password.length >= 6;
+}
+
+function sanitizePersonName(value) {
+  return String(value || "").trim().replace(/\\s+/g, " ");
+}
+
+function getRegisteredDisplayName(user) {
+  return `${user.firstName} ${user.lastName}`.trim();
+}
+
+function getRegisteredUserByEmail(email) {
+  const normalizedEmail = normalizeEmail(email);
+  return state.registeredUsers.find((item) => item.email === normalizedEmail);
+}
+
 function loadData() {
-  const stored = localStorage.getItem(STORAGE_KEY);
+  const stored = storage.getItem(STORAGE_KEY);
   if (!stored) {
     return normalizeData(structuredClone(demoData));
   }
@@ -180,11 +239,11 @@ function loadData() {
 }
 
 function saveData() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state.data));
+  storage.setItem(STORAGE_KEY, JSON.stringify(state.data));
 }
 
 function loadUser() {
-  const stored = localStorage.getItem(AUTH_KEY);
+  const stored = storage.getItem(AUTH_KEY);
   if (!stored) return null;
 
   try {
@@ -196,14 +255,14 @@ function loadUser() {
 
 function saveUser(user) {
   if (user) {
-    localStorage.setItem(AUTH_KEY, JSON.stringify(user));
+    storage.setItem(AUTH_KEY, JSON.stringify(user));
   } else {
-    localStorage.removeItem(AUTH_KEY);
+    storage.removeItem(AUTH_KEY);
   }
 }
 
 function loadRegisteredUsers() {
-  const stored = localStorage.getItem(USERS_KEY);
+  const stored = storage.getItem(USERS_KEY);
   if (!stored) return [];
 
   try {
@@ -212,10 +271,12 @@ function loadRegisteredUsers() {
 
     return parsed
       .map((item) => ({
+        id: item.id || `user-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
         firstName: item.firstName || item.name || "",
         lastName: item.lastName || "",
-        email: (item.email || "").toLowerCase(),
+        email: normalizeEmail(item.email || ""),
         password: item.password || "",
+        createdAt: item.createdAt || new Date().toISOString(),
         role: "Учасник"
       }))
       .filter((item) => item.email && item.password);
@@ -225,7 +286,7 @@ function loadRegisteredUsers() {
 }
 
 function saveRegisteredUsers() {
-  localStorage.setItem(USERS_KEY, JSON.stringify(state.registeredUsers));
+  storage.setItem(USERS_KEY, JSON.stringify(state.registeredUsers));
 }
 
 function normalizeData(data) {
@@ -256,7 +317,7 @@ function normalizeData(data) {
     };
   });
 
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+  storage.setItem(STORAGE_KEY, JSON.stringify(normalized));
   return normalized;
 }
 
@@ -706,6 +767,22 @@ function render() {
   renderAuthMode();
 }
 
+function syncStoredUser() {
+  if (!state.user) return;
+
+  const isAdminUser =
+    state.user.username === adminUser.username && state.user.role === adminUser.role;
+
+  if (isAdminUser) return;
+
+  const registeredUser = getRegisteredUserByEmail(state.user.username);
+  if (!registeredUser) {
+    state.user = null;
+    saveUser(null);
+    state.view = "login";
+  }
+}
+
 els.navButtons.forEach((button) => {
   button.addEventListener("click", () => setView(button.dataset.view));
 });
@@ -713,10 +790,24 @@ els.navButtons.forEach((button) => {
 els.authModeButtons.forEach((button) => {
   button.addEventListener("click", () => {
     state.authMode = button.dataset.authMode;
-    els.loginError.textContent = "";
-    els.registerError.textContent = "";
+    clearFormMessage(els.loginError);
+    clearFormMessage(els.registerError);
     renderAuthMode();
   });
+});
+
+["#login-username", "#login-password"].forEach((selector) => {
+  document.querySelector(selector).addEventListener("input", () => clearFormMessage(els.loginError));
+});
+
+[
+  "#register-first-name",
+  "#register-last-name",
+  "#register-email",
+  "#register-password",
+  "#register-password-confirm"
+].forEach((selector) => {
+  document.querySelector(selector).addEventListener("input", () => clearFormMessage(els.registerError));
 });
 
 els.adminModeButtons.forEach((button) => {
@@ -859,10 +950,16 @@ els.adminConferences.addEventListener("click", (event) => {
 
 els.loginForm.addEventListener("submit", (event) => {
   event.preventDefault();
-  els.loginError.textContent = "";
+  clearFormMessage(els.loginError);
 
   const username = document.querySelector("#login-username").value.trim();
   const password = document.querySelector("#login-password").value;
+  const normalizedUsername = normalizeEmail(username);
+
+  if (!username || !password) {
+    setFormMessage(els.loginError, "Введіть логін та пароль.");
+    return;
+  }
 
   if (username === adminUser.username && password === adminUser.password) {
     state.user = { name: adminUser.name, role: adminUser.role, username: adminUser.username };
@@ -874,16 +971,16 @@ els.loginForm.addEventListener("submit", (event) => {
   }
 
   const registeredUser = state.registeredUsers.find(
-    (item) => item.email === username.toLowerCase() && item.password === password
+    (item) => item.email === normalizedUsername && item.password === password
   );
 
   if (!registeredUser) {
-    els.loginError.textContent = "Невірний логін або пароль.";
+    setFormMessage(els.loginError, "Невірний логін або пароль.");
     return;
   }
 
   state.user = {
-    name: `${registeredUser.firstName} ${registeredUser.lastName}`.trim(),
+    name: getRegisteredDisplayName(registeredUser),
     role: registeredUser.role,
     username: registeredUser.email
   };
@@ -895,28 +992,51 @@ els.loginForm.addEventListener("submit", (event) => {
 
 els.registerForm.addEventListener("submit", (event) => {
   event.preventDefault();
-  els.registerError.textContent = "";
+  clearFormMessage(els.registerError);
 
-  const firstName = document.querySelector("#register-first-name").value.trim();
-  const lastName = document.querySelector("#register-last-name").value.trim();
-  const email = document.querySelector("#register-email").value.trim().toLowerCase();
+  const firstName = sanitizePersonName(document.querySelector("#register-first-name").value);
+  const lastName = sanitizePersonName(document.querySelector("#register-last-name").value);
+  const email = normalizeEmail(document.querySelector("#register-email").value);
   const password = document.querySelector("#register-password").value;
+  const passwordConfirm = document.querySelector("#register-password-confirm").value;
 
   if (!firstName || !lastName || !email || !password) {
-    els.registerError.textContent = "Заповніть усі поля.";
+    setFormMessage(els.registerError, "Заповніть усі поля.");
     return;
   }
 
-  if (state.registeredUsers.some((item) => item.email === email)) {
-    els.registerError.textContent = "Користувач із такою поштою вже існує.";
+  if (!isValidEmail(email)) {
+    setFormMessage(els.registerError, "Введіть коректну електронну пошту.");
+    return;
+  }
+
+  if (!isStrongEnoughPassword(password)) {
+    setFormMessage(els.registerError, "Пароль має містити щонайменше 6 символів.");
+    return;
+  }
+
+  if (password !== passwordConfirm) {
+    setFormMessage(els.registerError, "Паролі не співпадають.");
+    return;
+  }
+
+  if (email === normalizeEmail(adminUser.username) || email === normalizeEmail("admin@confspace.local")) {
+    setFormMessage(els.registerError, "Цю пошту не можна використовувати для реєстрації.");
+    return;
+  }
+
+  if (getRegisteredUserByEmail(email)) {
+    setFormMessage(els.registerError, "Користувач із такою поштою вже існує.");
     return;
   }
 
   state.registeredUsers.push({
+    id: `user-${Date.now()}`,
     firstName,
     lastName,
     email,
     password,
+    createdAt: new Date().toISOString(),
     role: "Учасник"
   });
   saveRegisteredUsers();
@@ -928,6 +1048,7 @@ els.registerForm.addEventListener("submit", (event) => {
   };
   saveUser(state.user);
   els.registerForm.reset();
+  setFormMessage(els.registerError, "Реєстрація успішна. Ви вже увійшли в систему.", "success");
   setView("public");
   render();
 });
@@ -1031,5 +1152,6 @@ els.conferenceForm.addEventListener("submit", (event) => {
   setView("public");
 });
 
+syncStoredUser();
 render();
 setView(state.view);

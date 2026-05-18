@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="uk">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ConfSpace | Розклад наукових конференцій</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand-mark">CS</div>
+        <div>
+          <p class="eyebrow">Веб-додаток</p>
+          <h1>ConfSpace</h1>
+        </div>
+      </div>
+
+      <nav class="top-nav" aria-label="Головна навігація">
+        <button class="nav-button" data-view="public">Конференції</button>
+        <button class="nav-button" data-view="schedule">Розклад</button>
+        <button class="nav-button" data-view="materials">Матеріали</button>
+        <button class="nav-button" data-view="admin">Адмін-панель</button>
+      </nav>
+
+      <div class="auth-status" id="auth-status">
+        <span id="auth-user">Гість</span>
+        <button id="logout-button" class="secondary-button hidden" type="button">Вийти</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero protected-content" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <p class="eyebrow">Наукові події в одному місці</p>
+          <h2 id="hero-title">Розклад, секції, доповіді та матеріали конференцій</h2>
+          <p>
+            Додаток допомагає учасникам швидко знайти потрібну доповідь,
+            переглянути секцію, спікера та відкрити супровідні матеріали.
+          </p>
+        </div>
+        <div class="hero-stats" aria-label="Статистика додатка">
+          <div>
+            <strong id="stat-conferences">0</strong>
+            <span>конференції</span>
+          </div>
+          <div>
+            <strong id="stat-talks">0</strong>
+            <span>доповідей</span>
+          </div>
+          <div>
+            <strong id="stat-materials">0</strong>
+            <span>матеріалів</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="toolbar protected-content" aria-label="Панель фільтрів">
+        <label class="field search-field">
+          <span>Пошук</span>
+          <input id="search-input" type="search" placeholder="Назва конференції або уроку" />
+        </label>
+        <label class="field">
+          <span>Тип</span>
+          <select id="type-filter">
+            <option value="all">Усе</option>
+            <option value="conference">Конференція</option>
+            <option value="lesson">Урок</option>
+          </select>
+        </label>
+        <button id="reset-filters" class="secondary-button" type="button">Очистити</button>
+      </section>
+
+      <section id="login-view" class="view active" aria-labelledby="login-title">
+        <div class="login-card">
+          <div class="login-copy">
+            <p class="eyebrow">Авторизація</p>
+            <h2 id="login-title">Увійдіть до ConfSpace</h2>
+            <p class="muted">
+              Після входу ви зможете переглядати конференції, розклад
+              доповідей, матеріали та доступні функції системи.
+            </p>
+          </div>
+
+          <div class="auth-card">
+            <div class="auth-switch" role="tablist" aria-label="Режим авторизації">
+              <button id="auth-login-tab" class="nav-button active" type="button" data-auth-mode="login">Вхід</button>
+              <button id="auth-register-tab" class="nav-button" type="button" data-auth-mode="register">Реєстрація</button>
+            </div>
+
+            <form id="login-form" class="login-form">
+              <label>
+                Пошта або логін адміністратора
+                <input id="login-username" type="text" required placeholder="admin або your@email.com" />
+              </label>
+              <label>
+                Пароль
+                <input id="login-password" type="password" required placeholder="1234" />
+              </label>
+              <p id="login-error" class="form-error" aria-live="polite"></p>
+              <button class="primary-button" type="submit">Увійти</button>
+            </form>
+
+            <form id="register-form" class="login-form hidden">
+              <strong>Реєстрація учасника</strong>
+              <label>
+                Ім'я
+                <input id="register-first-name" type="text" required placeholder="Введіть ім'я" />
+              </label>
+              <label>
+                Прізвище
+                <input id="register-last-name" type="text" required placeholder="Введіть прізвище" />
+              </label>
+              <label>
+                Пошта
+                <input id="register-email" type="email" required placeholder="student@example.com" />
+              </label>
+              <label>
+                Пароль
+                <input id="register-password" type="password" required placeholder="Створіть пароль" />
+              </label>
+              <p id="register-error" class="form-error" aria-live="polite"></p>
+              <button class="primary-button" type="submit">Зареєструватися</button>
+            </form>
+
+            <div class="demo-credentials">
+              <strong>Демо-доступ адміністратора:</strong>
+              <span>admin / 1234</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="public-view" class="view" aria-labelledby="public-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Огляд</p>
+            <h2 id="public-title">Доступні конференції</h2>
+          </div>
+        </div>
+        <div id="conference-list" class="conference-grid"></div>
+      </section>
+
+      <section id="schedule-view" class="view" aria-labelledby="schedule-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Програма</p>
+            <h2 id="schedule-title">Розклад доповідей</h2>
+          </div>
+          <button id="print-schedule" class="secondary-button" type="button">Друкувати розклад</button>
+        </div>
+        <div id="schedule-list" class="schedule-list"></div>
+      </section>
+
+      <section id="materials-view" class="view" aria-labelledby="materials-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Файли та посилання</p>
+            <h2 id="materials-title">Матеріали конференцій</h2>
+          </div>
+        </div>
+        <div id="materials-list" class="materials-list"></div>
+      </section>
+
+      <section id="admin-view" class="view" aria-labelledby="admin-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Керування даними</p>
+            <h2 id="admin-title">Адміністративна панель</h2>
+          </div>
+        </div>
+
+        <div class="admin-layout">
+          <div class="admin-forms">
+          <div class="admin-mode-switch" role="tablist" aria-label="Режим створення">
+            <button id="mode-talk" class="nav-button admin-mode-button active" type="button" data-admin-mode="talk">Доповідь / предмет</button>
+            <button id="mode-conference" class="nav-button admin-mode-button" type="button" data-admin-mode="conference">Конференція</button>
+          </div>
+
+          <form id="talk-form" class="admin-form">
+            <h3 id="form-title-heading">Додати доповідь</h3>
+            <label>
+              Конференція
+              <select id="form-conference" required></select>
+            </label>
+            <label>
+              Секція
+              <input id="form-section" type="text" required placeholder="Наприклад: Програмна інженерія" />
+            </label>
+            <label>
+              Назва доповіді
+              <input id="form-title" type="text" required placeholder="Введіть назву доповіді" />
+            </label>
+            <label>
+              Спікер
+              <input id="form-speaker" type="text" required placeholder="ПІБ доповідача" />
+            </label>
+            <label>
+              Роль спікера
+              <select id="form-speaker-role" required>
+                <option value="Учасник">Учасник</option>
+                <option value="Студент">Студент</option>
+                <option value="Викладач">Викладач</option>
+                <option value="Науковий керівник">Науковий керівник</option>
+                <option value="Запрошений експерт">Запрошений експерт</option>
+              </select>
+            </label>
+            <div class="form-row">
+              <label>
+                Дата
+                <input id="form-date" type="date" required />
+              </label>
+              <label>
+                Час
+                <input id="form-time" type="time" required />
+              </label>
+            </div>
+            <label>
+              Опис
+              <textarea id="form-description" rows="4" placeholder="Короткий опис доповіді"></textarea>
+            </label>
+            <label>
+              Матеріал або посилання
+              <input id="form-material" type="url" placeholder="https://example.com/material.pdf" />
+            </label>
+            <div class="form-actions">
+              <button id="submit-talk" class="primary-button" type="submit">Додати до розкладу</button>
+              <button id="cancel-edit" class="secondary-button hidden" type="button">Скасувати редагування</button>
+            </div>
+          </form>
+
+          <form id="conference-form" class="admin-form hidden">
+            <h3>Створити конференцію</h3>
+            <label>
+              Назва конференції
+              <input id="conference-title" type="text" required placeholder="Введіть назву конференції" />
+            </label>
+            <label>
+              Опис
+              <textarea id="conference-description" rows="4" placeholder="Короткий опис конференції"></textarea>
+            </label>
+            <div class="form-row">
+              <label>
+                Дата початку
+                <input id="conference-start-date" type="date" required />
+              </label>
+              <label>
+                Дата завершення
+                <input id="conference-end-date" type="date" required />
+              </label>
+            </div>
+            <div class="form-row">
+              <label>
+                Формат
+                <select id="conference-format" required>
+                  <option value="Online">Online</option>
+                  <option value="Змішаний">Змішаний</option>
+                  <option value="Офлайн">Офлайн</option>
+                </select>
+              </label>
+              <label>
+                Статус
+                <select id="conference-status" required>
+                  <option value="Запланована">Запланована</option>
+                  <option value="Актуальна">Актуальна</option>
+                  <option value="Завершена">Завершена</option>
+                </select>
+              </label>
+            </div>
+            <label>
+              Місце або платформа
+              <input id="conference-location" type="text" required placeholder="Наприклад: Microsoft Teams або Київ" />
+            </label>
+            <label>
+              Посилання на приєднання
+              <input id="conference-join-url" type="url" placeholder="https://..." />
+            </label>
+            <div class="form-actions">
+              <button id="submit-conference" class="primary-button" type="submit">Створити конференцію</button>
+            </div>
+          </form>
+          </div>
+
+          <div class="admin-panel">
+            <h3>Показники системи</h3>
+            <div id="admin-stats" class="admin-stats"></div>
+            <h3>Конференції</h3>
+            <div id="admin-conferences" class="admin-talks"></div>
+            <h3>Останні записи</h3>
+            <div id="admin-talks" class="admin-talks"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <div id="material-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div class="modal-panel">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Матеріали доповіді</p>
+            <h2 id="modal-title">Назва матеріалу</h2>
+          </div>
+          <button id="modal-close" class="secondary-button" type="button">Закрити</button>
+        </div>
+        <div id="modal-body" class="modal-body"></div>
+      </div>
+    </div>
+
+    <div id="conference-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="conference-modal-title">
+      <div class="modal-panel">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Деталі конференції</p>
+            <h2 id="conference-modal-title">Назва конференції</h2>
+          </div>
+          <button id="conference-modal-close" class="secondary-button" type="button">Закрити</button>
+        </div>
+        <div id="conference-modal-body" class="modal-body"></div>
+      </div>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>

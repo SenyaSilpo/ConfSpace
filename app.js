@@ -112,6 +112,10 @@ const demoData = {
   ]
 };
 
+let memoryStorage = {};
+
+const storage = getStorage();
+
 const state = {
   data: loadData(),
   view: loadUser() ? "public" : "login",
@@ -123,8 +127,6 @@ const state = {
   authMode: "login",
   registeredUsers: loadRegisteredUsers()
 };
-
-let memoryStorage = {};
 
 const els = {
   navButtons: document.querySelectorAll(".top-nav .nav-button"),
@@ -189,7 +191,7 @@ function getStorage() {
   }
 }
 
-const storage = getStorage();
+const urlParams = new URLSearchParams(window.location.search);
 
 function setFormMessage(element, message, type = "error") {
   element.textContent = message;
@@ -783,6 +785,51 @@ function syncStoredUser() {
   }
 }
 
+function applyDemoQueryState() {
+  const autoLogin = urlParams.get("autologin");
+  if (autoLogin === "admin") {
+    state.user = { name: adminUser.name, role: adminUser.role, username: adminUser.username };
+    saveUser(state.user);
+  }
+
+  if (autoLogin === "guest") {
+    state.user = null;
+    saveUser(null);
+  }
+
+  const authMode = urlParams.get("authMode");
+  if (authMode === "register" || authMode === "login") {
+    state.authMode = authMode;
+  }
+
+  const view = urlParams.get("view");
+  if (["login", "public", "schedule", "materials", "admin"].includes(view)) {
+    state.view = view;
+  }
+
+  const search = urlParams.get("search");
+  if (search) {
+    state.search = search;
+  }
+
+  const type = urlParams.get("type");
+  if (["all", "conference", "lesson"].includes(type)) {
+    state.type = type;
+  }
+}
+
+function applyDemoActions() {
+  const openConferenceId = urlParams.get("openConference");
+  if (openConferenceId) {
+    openConferenceDetails(openConferenceId);
+  }
+
+  const openMaterialId = urlParams.get("openMaterial");
+  if (openMaterialId) {
+    openMaterial(openMaterialId);
+  }
+}
+
 els.navButtons.forEach((button) => {
   button.addEventListener("click", () => setView(button.dataset.view));
 });
@@ -1153,5 +1200,9 @@ els.conferenceForm.addEventListener("submit", (event) => {
 });
 
 syncStoredUser();
+applyDemoQueryState();
 render();
 setView(state.view);
+els.searchInput.value = state.search;
+els.typeFilter.value = state.type;
+applyDemoActions();
